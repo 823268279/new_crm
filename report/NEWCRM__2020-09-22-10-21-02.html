@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <style>body {
+	font-family: Helvetica, Arial, sans-serif;
+	font-size: 12px;
+	/* do not increase min-width as some may use split screens */
+	min-width: 800px;
+	color: #999;
+}
+
+h1 {
+	font-size: 24px;
+	color: black;
+}
+
+h2 {
+	font-size: 16px;
+	color: black;
+}
+
+p {
+    color: black;
+}
+
+a {
+	color: #999;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+
+#environment td {
+	padding: 5px;
+	border: 1px solid #E6E6E6;
+}
+
+#environment tr:nth-child(odd) {
+	background-color: #f6f6f6;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed, .passed .col-result {
+	color: green;
+}
+span.skipped, span.xfailed, span.rerun, .skipped .col-result, .xfailed .col-result, .rerun .col-result {
+	color: orange;
+}
+span.error, span.failed, span.xpassed, .error .col-result, .failed .col-result, .xpassed .col-result  {
+	color: red;
+}
+
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+
+#results-table {
+	border: 1px solid #e6e6e6;
+	color: #999;
+	font-size: 12px;
+	width: 100%
+}
+
+#results-table th, #results-table td {
+	padding: 5px;
+	border: 1px solid #E6E6E6;
+	text-align: left
+}
+#results-table th {
+	font-weight: bold
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+
+.log:only-child {
+	height: inherit
+}
+.log {
+	background-color: #e6e6e6;
+	border: 1px solid #e6e6e6;
+	color: black;
+	display: block;
+	font-family: "Courier New", Courier, monospace;
+	height: 230px;
+	overflow-y: scroll;
+	padding: 5px;
+	white-space: pre-wrap
+}
+div.image {
+	border: 1px solid #e6e6e6;
+	float: right;
+	height: 240px;
+	margin-left: 5px;
+	overflow: hidden;
+	width: 320px
+}
+div.image img {
+	width: 320px
+}
+div.video {
+	border: 1px solid #e6e6e6;
+	float: right;
+	height: 240px;
+	margin-left: 5px;
+	overflow: hidden;
+	width: 320px
+}
+div.video video {
+	overflow: hidden;
+	width: 320px;
+    height: 240px;
+}
+.collapsed {
+	display: none;
+}
+.expander::after {
+	content: " (show details)";
+	color: #BBB;
+	font-style: italic;
+	cursor: pointer;
+}
+.collapser::after {
+	content: " (hide details)";
+	color: #BBB;
+	font-style: italic;
+	cursor: pointer;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+	cursor: pointer;
+}
+
+.sort-icon {
+	font-size: 0px;
+	float: left;
+	margin-right: 5px;
+	margin-top: 5px;
+	/*triangle*/
+	width: 0;
+	height: 0;
+	border-left: 8px solid transparent;
+	border-right: 8px solid transparent;
+}
+
+.inactive .sort-icon {
+	/*finish triangle*/
+	border-top: 8px solid #E6E6E6;
+}
+
+.asc.active .sort-icon {
+	/*finish triangle*/
+	border-bottom: 8px solid #999;
+}
+
+.desc.active .sort-icon {
+	/*finish triangle*/
+	border-top: 8px solid #999;
+}
+</style></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    var colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    var key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() {
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() {
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove("collapsed");
+    expandcollapse.classList.remove("expander");
+    expandcollapse.classList.add("collapser");
+}
+
+function hide_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add("collapsed");
+    expandcollapse.classList.remove("collapser");
+    expandcollapse.classList.add("expander");
+}
+
+function show_filters() {
+    var filter_items = document.getElementsByClassName('filter');
+    for (var i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    var resulttable = find('table#results-table');
+    var showhideall = document.createElement("p");
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        var collapsed = get_query_parameter('collapsed') || 'Passed';
+        var extras = elem.parentNode.nextElementSibling;
+        var expandcollapse = document.createElement("span");
+        if (extras.classList.contains("collapsed")) {
+            expandcollapse.classList.add("expander")
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add("collapsed");
+            expandcollapse.classList.add("expander");
+        } else {
+            expandcollapse.classList.add("collapser");
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener("click", function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains("collapsed")) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    })
+}
+
+function get_query_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () {
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    sort_column(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener("click",
+                              function(event) {
+                                  sort_column(elem);
+                              }, false)
+    });
+
+};
+
+function sort_table(clicked, key_func) {
+    var rows = find_all('.results-table-row');
+    var reversed = !clicked.classList.contains('asc');
+    var sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    var thead = document.getElementById("results-table-head");
+    document.getElementById('results-table').remove();
+    var parent = document.createElement("table");
+    parent.id = "results-table";
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName("BODY")[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    var sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+
+    sort_array.sort(function(a, b) {
+        var key_a = a[0];
+        var key_b = b[0];
+
+        if (key_a == key_b) return 0;
+
+        if (reversed) {
+            return (key_a < key_b ? 1 : -1);
+        } else {
+            return (key_a > key_b ? 1 : -1);
+        }
+    });
+
+    return sort_array.map(function(item) {
+        var index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        var strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+                       'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        var icon = document.createElement("div");
+        icon.className = "sort-icon";
+        icon.textContent = "vvv";
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove("desc", "active");
+        elem.classList.add("asc", "inactive");
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+  return value.hidden == false;
+}
+
+function filter_table(elem) {
+    var outcome_att = "data-test-result";
+    var outcome = elem.getAttribute(outcome_att);
+    class_outcome = outcome + " results-table-row";
+    var outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(var i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    var rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    var all_rows_hidden = rows.length == 0 ? true : false;
+    var not_found_message = document.getElementById("not-found-message");
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>NEWCRM__2020-09-22-10-21-02.html</h1>
+    <p>Report generated on 22-Sep-2020 at 10:22:20 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v2.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.8.1", "pytest": "5.4.1"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.18362-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"html": "2.1.1", "metadata": "1.9.0", "sugar": "0.9.3"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.8.2</td></tr>
+      <tr>
+        <td>测试地址</td>
+        <td><a href="http://api.newcrm.group.weixin.wuerp.com" target="_blank">http://api.newcrm.group.weixin.wuerp.com</a></td></tr>
+      <tr>
+        <td>项目名称</td>
+        <td>NEW_CRM_v1.0</td></tr></table>
+    <h2>Summary</h2>
+    <p>所属部门: 测试部</p>
+    <p>测试人员: wowo</p>
+    <p>48 tests ran in 77.75 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">46 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">2 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th>Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">conftest/test_crm.py::Test_integral_adjustment::test_check_integral_adjustment</td>
+          <td class="col-duration">0.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;conftest.test_crm.Test_integral_adjustment object at 0x000001A21D635E80&gt;, manage = {&#x27;password&#x27;: &#x27;111111&#x27;, &#x27;url&#x27;: &#x27;http://wcrmmanagement.weixin.wuerp.com%s&#x27;, &#x27;username&#x27;: &#x27;miscs3&#x27;}<br/>session = &lt;requests.sessions.Session object at 0x000001A21D5A41F0&gt;, integral_adjustment_data = {&#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-10 11:30:27&#x27;, &#x27;BllNo&#x27;: &#x27;0092009101130278598360200002&#x27;, ...}<br/><br/>    def test_check_integral_adjustment(self,manage,session,integral_adjustment_data):<br/>        data={}<br/>        try:<br/>            data[&#x27;bllNo&#x27;] = integral_adjustment_data[&#x27;BllNo&#x27;]<br/>            data[&#x27;stt&#x27;] = &#x27;50&#x27;<br/>            response=session.post(url=manage[&#x27;url&#x27;] % &#x27;/Basics/IntgCrtn/ToExamine&#x27;,data=data)<br/>            response_json = comm_way.response_dispose(response.json())<br/>            print(response_json[&#x27;Message&#x27;])<br/>            assert response.status_code == 200<br/>&gt;           assert response_json[&#x27;Success&#x27;] == True<br/><span class="error">E           assert False == True</span><br/><span class="error">E             +False</span><br/><span class="error">E             -True</span><br/><br/>..\conftest\test_crm.py:516: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>流程已结束不能进行操作
+<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">conftest/test_crm.py::Test_integral_exchange_gift::test_add_integral_exchange</td>
+          <td class="col-duration">0.14</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;conftest.test_crm.Test_integral_exchange_gift object at 0x000001A21D6A6A90&gt;, manage = {&#x27;password&#x27;: &#x27;111111&#x27;, &#x27;url&#x27;: &#x27;http://wcrmmanagement.weixin.wuerp.com%s&#x27;, &#x27;username&#x27;: &#x27;miscs3&#x27;}<br/>session = &lt;requests.sessions.Session object at 0x000001A21D5A41F0&gt;, vipcard_data = {&#x27;Addr&#x27;: &#x27;&#x27;, &#x27;Brthdy&#x27;: &#x27;1933-07-23 00:00:00&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000240913680426&#x27;, ...}<br/>member_account = {&#x27;ABC&#x27;: &#x27;&#x27;, &#x27;Actvgrd&#x27;: &#x27;&#x27;, &#x27;Avt&#x27;: &#x27;&#x27;, &#x27;BabyStt&#x27;: &#x27;F&#x27;, ...}, exchange_activity_data_b = {&#x27;Amt&#x27;: &#x27;4037&#x27;, &#x27;Bestowal&#x27;: &#x27;2229741860193&#x27;, &#x27;BllNo&#x27;: &#x27;01820000256100629&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, ...}<br/><br/>    def test_add_integral_exchange(self,manage,session,vipcard_data,member_account,exchange_activity_data_b):<br/>        data={}<br/>        try:<br/>            data[&#x27;t[OrgID]&#x27;] = vipcard_data[&#x27;OrgID&#x27;]<br/>            data[&#x27;t[VipID]&#x27;] = vipcard_data[&#x27;VipID&#x27;]<br/>            data[&#x27;t[GstID]&#x27;] = vipcard_data[&#x27;GstID&#x27;]<br/>            data[&#x27;t[CrdNo]&#x27;] = vipcard_data[&#x27;CrdNo&#x27;]<br/>            data[&#x27;t[CrdID]&#x27;] = vipcard_data[&#x27;CrdID&#x27;]<br/>            data[&#x27;t[VipTpID]&#x27;] = vipcard_data[&#x27;VipTpID&#x27;]<br/>            if member_account[&#x27;IntgAva&#x27;]:<br/>                data[&#x27;t[IntgAva]&#x27;] = int(float(member_account[&#x27;IntgAva&#x27;]))   #积分余额<br/>            else:<br/>                data[&#x27;t[IntgAva]&#x27;] = 0<br/>            data[&#x27;t[SumIntg]&#x27;] = int(float(exchange_activity_data_b[&#x27;Amt&#x27;]))*2   #扣除积分<br/>            data[&#x27;t[SumTknMoney]&#x27;] = &#x27;0&#x27;<br/>            data[&#x27;t[SumChgMoney]&#x27;] = &#x27;0&#x27;<br/>            data[&#x27;t[Brf]&#x27;] = &#x27;apitest&#x27;<br/>            data[&#x27;list[0][BllNo]&#x27;] = exchange_activity_data_b[&#x27;BllNo&#x27;]       #返利活动编号<br/>            data[&#x27;list[0][Lvl]&#x27;] = &#x27;1&#x27;<br/>            data[&#x27;list[0][CpnID]&#x27;] = exchange_activity_data_b[&#x27;CpnID&#x27;]<br/>            data[&#x27;list[0][IntgCshBllNo]&#x27;] = exchange_activity_data_b[&#x27;BllNo&#x27;]    #返利活动编号<br/>            data[&#x27;list[0][Bestowal]&#x27;] = exchange_activity_data_b[&#x27;Bestowal&#x27;]     #兑换商品编号<br/>            data[&#x27;list[0][Name]&#x27;] = exchange_activity_data_b[&#x27;Name&#x27;]     #兑换实物名称<br/>            data[&#x27;list[0][Amt]&#x27;] = exchange_activity_data_b[&#x27;Amt&#x27;] #活动兑换积分<br/>            data[&#x27;list[0][UseIntg]&#x27;] = int(float(exchange_activity_data_b[&#x27;Amt&#x27;]))*2   #应扣积分<br/>            data[&#x27;list[0][Qty]&#x27;] = &#x27;2&#x27;  #兑换数量<br/>            data[&#x27;list[0][TknID]&#x27;] = &#x27;&#x27;<br/>            data[&#x27;list[0][TknAmt]&#x27;] = &#x27;0&#x27;<br/>            data[&#x27;list[0][StepVal]&#x27;] = &#x27;0&#x27;<br/>            data[&#x27;list[0][ProfitPer]&#x27;] = &#x27;0&#x27;<br/>            data[&#x27;list[0][TStDt]&#x27;] = &#x27;&#x27;<br/>            data[&#x27;list[0][TEdDt]&#x27;] = &#x27;&#x27;<br/>            data[&#x27;list[0][UseOrgID]&#x27;] = &#x27;&#x27;<br/>            data[&#x27;list[0][ChangeMoney]&#x27;] = &#x27;0&#x27;<br/>            data[&#x27;list[0][IntgCshLvl]&#x27;] = &#x27;1&#x27;<br/>            data[&#x27;list[0][BillType]&#x27;] = &#x27;1&#x27;<br/>            data[&#x27;list[0][ChgMoney]&#x27;] = &#x27;0&#x27;<br/>            data[&#x27;list[0][CanlFlg]&#x27;] = &#x27;F&#x27;<br/>            data[&#x27;list[0][Brf]&#x27;] = &#x27;apitest&#x27;<br/>            data[&#x27;list[0][Rdx]&#x27;] = &#x27;1&#x27;<br/>            print(data)<br/>            response=session.post(url=manage[&#x27;url&#x27;] % &#x27;/Card/IntgExChange/Add&#x27;,data=data)<br/>            response_json = comm_way.response_dispose(response.json())<br/>            print(response_json[&#x27;Message&#x27;])<br/>            assert response.status_code == 200<br/>&gt;           assert response_json[&#x27;Success&#x27;] == True<br/><span class="error">E           assert False == True</span><br/><span class="error">E             +False</span><br/><span class="error">E             -True</span><br/><br/>..\conftest\test_crm.py:670: AssertionError<br/> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;t[OrgID]&#x27;: &#x27;0000&#x27;, &#x27;t[VipID]&#x27;: &#x27;8820000240913680&#x27;, &#x27;t[GstID]&#x27;: &#x27;1732&#x27;, &#x27;t[CrdNo]&#x27;: &#x27;8820000240913680&#x27;, &#x27;t[CrdID]&#x27;: &#x27;18820000240913680426&#x27;, &#x27;t[VipTpID]&#x27;: &#x27;&#x27;, &#x27;t[IntgAva]&#x27;: 0, &#x27;t[SumIntg]&#x27;: 8074, &#x27;t[SumTknMoney]&#x27;: &#x27;0&#x27;, &#x27;t[SumChgMoney]&#x27;: &#x27;0&#x27;, &#x27;t[Brf]&#x27;: &#x27;apitest&#x27;, &#x27;list[0][BllNo]&#x27;: &#x27;01820000256100629&#x27;, &#x27;list[0][Lvl]&#x27;: &#x27;1&#x27;, &#x27;list[0][CpnID]&#x27;: &#x27;200002&#x27;, &#x27;list[0][IntgCshBllNo]&#x27;: &#x27;01820000256100629&#x27;, &#x27;list[0][Bestowal]&#x27;: &#x27;2229741860193&#x27;, &#x27;list[0][Name]&#x27;: &#x27;赠品名称u983&#x27;, &#x27;list[0][Amt]&#x27;: &#x27;4037&#x27;, &#x27;list[0][UseIntg]&#x27;: 8074, &#x27;list[0][Qty]&#x27;: &#x27;2&#x27;, &#x27;list[0][TknID]&#x27;: &#x27;&#x27;, &#x27;list[0][TknAmt]&#x27;: &#x27;0&#x27;, &#x27;list[0][StepVal]&#x27;: &#x27;0&#x27;, &#x27;list[0][ProfitPer]&#x27;: &#x27;0&#x27;, &#x27;list[0][TStDt]&#x27;: &#x27;&#x27;, &#x27;list[0][TEdDt]&#x27;: &#x27;&#x27;, &#x27;list[0][UseOrgID]&#x27;: &#x27;&#x27;, &#x27;list[0][ChangeMoney]&#x27;: &#x27;0&#x27;, &#x27;list[0][IntgCshLvl]&#x27;: &#x27;1&#x27;, &#x27;list[0][BillType]&#x27;: &#x27;1&#x27;, &#x27;list[0][ChgMoney]&#x27;: &#x27;0&#x27;, &#x27;list[0][CanlFlg]&#x27;: &#x27;F&#x27;, &#x27;list[0][Brf]&#x27;: &#x27;apitest&#x27;, &#x27;list[0][Rdx]&#x27;: &#x27;1&#x27;}
+积分不足,当前可用积分为:0
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::test_get_organization</td>
+          <td class="col-duration">0.10</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -----------------------------Captured stdout setup------------------------------ <br/>{&#x27;Success&#x27;: True, &#x27;Errorcode&#x27;: 0, &#x27;Message&#x27;: &#x27;&#x27;, &#x27;Data&#x27;: {}}
+登录成功
+<br/> ------------------------------Captured stdout call------------------------------ <br/>
+[{&#x27;id&#x27;: 1, &#x27;name&#x27;: &#x27;总部&#x27;, &#x27;pid&#x27;: 0, &#x27;OrgID&#x27;: &#x27;0000&#x27;}, {&#x27;id&#x27;: 2, &#x27;name&#x27;: &#x27;大卖场1&#x27;, &#x27;pid&#x27;: 1, &#x27;OrgID&#x27;: &#x27;1001&#x27;}, {&#x27;id&#x27;: 3, &#x27;name&#x27;: &#x27; 大卖场2&#x27;, &#x27;pid&#x27;: 1, &#x27;OrgID&#x27;: &#x27;1002&#x27;}]
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_gift::test_add_gift</td>
+          <td class="col-duration">0.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;Success&#x27;: True, &#x27;Errorcode&#x27;: 0, &#x27;Message&#x27;: &#x27;操作成功&#x27;, &#x27;Data&#x27;: {}}
+操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_gift::test_get_gift_data_page</td>
+          <td class="col-duration">2.15</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;2229741860193&#x27;, &#x27;Bcd&#x27;: &#x27;2229741860193&#x27;, &#x27;Name&#x27;: &#x27;赠品名称u983&#x27;, &#x27;Spc&#x27;: &#x27;635g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;袋&#x27;, &#x27;SalPrc&#x27;: 12356, &#x27;PurPrc&#x27;: 9424, &#x27;Plc&#x27;: &#x27;福建&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌c1250&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:09&#x27;}
+{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;1914571343147&#x27;, &#x27;Bcd&#x27;: &#x27;1914571343147&#x27;, &#x27;Name&#x27;: &#x27;赠品名称e559&#x27;, &#x27;Spc&#x27;: &#x27;622g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;盒&#x27;, &#x27;SalPrc&#x27;: 11644, &#x27;PurPrc&#x27;: 8335, &#x27;Plc&#x27;: &#x27;河北&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌p1455&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:05:13&#x27;}
+{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;1719542199816&#x27;, &#x27;Bcd&#x27;: &#x27;1719542199816&#x27;, &#x27;Name&#x27;: &#x27;赠品名称f1026&#x27;, &#x27;Spc&#x27;: &#x27;522g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;瓶&#x27;, &#x27;SalPrc&#x27;: 14507, &#x27;PurPrc&#x27;: 11711, &#x27;Plc&#x27;: &#x27;吉林&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌m1152&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:30:58&#x27;}
+{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;1271031371626&#x27;, &#x27;Bcd&#x27;: &#x27;1271031371626&#x27;, &#x27;Name&#x27;: &#x27;赠品名称c1079&#x27;, &#x27;Spc&#x27;: &#x27;545g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;瓶&#x27;, &#x27;SalPrc&#x27;: 11198, &#x27;PurPrc&#x27;: 9424, &#x27;Plc&#x27;: &#x27;安徽&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌t1496&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:18:41&#x27;}
+{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;1939851322293&#x27;, &#x27;Bcd&#x27;: &#x27;1939851322293&#x27;, &#x27;Name&#x27;: &#x27;赠品名称s807&#x27;, &#x27;Spc&#x27;: &#x27;415g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;件&#x27;, &#x27;SalPrc&#x27;: 16967, &#x27;PurPrc&#x27;: 13422, &#x27;Plc&#x27;: &#x27;青海&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌x1447&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:15:24&#x27;}
+{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;2632991017078&#x27;, &#x27;Bcd&#x27;: &#x27;2632991017078&#x27;, &#x27;Name&#x27;: &#x27;赠品名称a1241&#x27;, &#x27;Spc&#x27;: &#x27;365g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;盒&#x27;, &#x27;SalPrc&#x27;: 10950, &#x27;PurPrc&#x27;: 9296, &#x27;Plc&#x27;: &#x27;云南&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌i1945&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:13:32&#x27;}
+{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;852741989490&#x27;, &#x27;Bcd&#x27;: &#x27;852741989490&#x27;, &#x27;Name&#x27;: &#x27;赠品名称g569&#x27;, &#x27;Spc&#x27;: &#x27;579g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;袋&#x27;, &#x27;SalPrc&#x27;: 11819, &#x27;PurPrc&#x27;: 9458, &#x27;Plc&#x27;: &#x27;四川&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌d1032&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:40:59&#x27;}
+{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;2270591320383&#x27;, &#x27;Bcd&#x27;: &#x27;2270591320383&#x27;, &#x27;Name&#x27;: &#x27;赠品名称h1372&#x27;, &#x27;Spc&#x27;: &#x27;535g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;袋&#x27;, &#x27;SalPrc&#x27;: 10637, &#x27;PurPrc&#x27;: 8778, &#x27;Plc&#x27;: &#x27;云南&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌j1664&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:02:50&#x27;}
+{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;2423401908996&#x27;, &#x27;Bcd&#x27;: &#x27;2423401908996&#x27;, &#x27;Name&#x27;: &#x27;赠品名称i1107&#x27;, &#x27;Spc&#x27;: &#x27;242g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;瓶&#x27;, &#x27;SalPrc&#x27;: 16482, &#x27;PurPrc&#x27;: 13048, &#x27;Plc&#x27;: &#x27;湖北&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌l682&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;apitesst&#x27;, &#x27;Brf&#x27;: &#x27;apitesst&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 14:12:29&#x27;}
+{&#x27;PrtName&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GdsID&#x27;: &#x27;1490181050852&#x27;, &#x27;Bcd&#x27;: &#x27;1490181050852&#x27;, &#x27;Name&#x27;: &#x27;赠品名称d1137&#x27;, &#x27;Spc&#x27;: &#x27;259g&#x27;, &#x27;HlpCd&#x27;: &#x27;&#x27;, &#x27;Unit&#x27;: &#x27;箱&#x27;, &#x27;SalPrc&#x27;: 14647, &#x27;PurPrc&#x27;: 13048, &#x27;Plc&#x27;: &#x27;海南&#x27;, &#x27;Fctry&#x27;: &#x27;赠品品牌l1642&#x27;, &#x27;BndInfo&#x27;: &#x27;&#x27;, &#x27;ImgUrl&#x27;: &#x27;&#x27;, &#x27;Dsc&#x27;: &#x27;apitesst&#x27;, &#x27;Brf&#x27;: &#x27;apitesst&#x27;, &#x27;Source&#x27;: 0, &#x27;Stt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 11:39:49&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_register_activity_gift::test_add_register_activity</td>
+          <td class="col-duration">0.15</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_register_activity_gift::test_get_register_activity_page</td>
+          <td class="col-duration">2.15</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 1, &#x27;DateSttName&#x27;: &#x27;活动待执行&#x27;, &#x27;BllNo&#x27;: &#x27;0122009221021133839765200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动TP173104&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:13&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-22 10:21:09&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:13&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 1, &#x27;DateSttName&#x27;: &#x27;活动待执行&#x27;, &#x27;BllNo&#x27;: &#x27;0122009221021133839765200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动TP173104&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:13&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-22 10:21:09&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:13&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;白银会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009220905227715787200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动XF5860&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:22&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;02&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-22 09:05:19&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009220905180450202200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动OW140135&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:18&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-22 09:05:14&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211718506712277200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动KJ156133&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:18:50&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:18:48&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211718462319381200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动MF11056&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:18:46&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;03&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:18:43&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211715337810316200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动QQ107116&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:15:33&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:15:31&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:38&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211715293336683200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动BD34118&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:15:29&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;04&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:15:26&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:38&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211713417797085200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动FK8688&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:13:41&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;04&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:13:39&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:48&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;白银会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211713372151097200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动NA88155&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:13:37&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;02&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:13:34&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:48&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211641080235534200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动NL80130&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:41:08&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;04&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 16:41:05&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:42:14&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_register_activity_gift::test_check_register_activity</td>
+          <td class="col-duration">0.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_register_activity_integral::test_add_register_activity</td>
+          <td class="col-duration">0.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_register_activity_integral::test_get_register_activity_page</td>
+          <td class="col-duration">2.15</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;白银会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 1, &#x27;DateSttName&#x27;: &#x27;活动待执行&#x27;, &#x27;BllNo&#x27;: &#x27;0122009221021179360971200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动GU106103&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:17&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;02&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-22 10:21:14&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:17&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 2, &#x27;DateSttName&#x27;: &#x27;活动正在执行&#x27;, &#x27;BllNo&#x27;: &#x27;0122009221021133839765200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动TP173104&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:13&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-22 10:21:09&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:18&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;白银会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009220905227715787200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动XF5860&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:22&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;02&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-22 09:05:19&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009220905180450202200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动OW140135&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:18&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-22 09:05:14&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211718506712277200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动KJ156133&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:18:50&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:18:48&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211718462319381200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动MF11056&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:18:46&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;03&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:18:43&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211715337810316200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动QQ107116&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:15:33&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:15:31&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:38&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211715293336683200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动BD34118&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:15:29&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;04&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:15:26&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:38&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211713417797085200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动FK8688&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:13:41&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;04&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:13:39&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:48&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;白银会员&#x27;, &#x27;PrmtTypName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0122009211713372151097200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动NA88155&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:13:37&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTps&#x27;: &#x27;02&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;StDt&#x27;: &#x27;2020-09-21 17:13:34&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:48&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_register_activity_integral::test_check_register_activity</td>
+          <td class="col-duration">0.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_register::test_add_member_register</td>
+          <td class="col-duration">0.31</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;RgstInfo&#x27;: &quot;{&#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009221021133839765200002&#x27;, &#x27;Name&#x27;: &#x27;OIvnitb&#x27;, &#x27;Tel&#x27;: &#x27;13767125061&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;516009193307237257&#x27;, &#x27;Brth&#x27;: &#x27;1933-07-23&#x27;, &#x27;Sex&#x27;: &#x27;0&#x27;}&quot;, &#x27;ExAtr&#x27;: &#x27;&#x27;}
+操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_register::test_get_member_register_page</td>
+          <td class="col-duration">2.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动TP173104&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009221021225071732200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:22&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009221021133839765200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000240913680426&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000240913680&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;VipID&#x27;: &#x27;8820000240913680&#x27;, &#x27;Tel&#x27;: &#x27;13767125061&#x27;, &#x27;Name&#x27;: &#x27;OIvnitb&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;516009193307237257&#x27;, &#x27;Brth&#x27;: &#x27;1933-07-23 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-22 10:21:22&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:22&#x27;}
+{&#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动OW140135&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009220905282160548200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:28&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009220905180450202200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000262593612519&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000262593612&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: 1731, &#x27;VipID&#x27;: &#x27;8820000262593612&#x27;, &#x27;Tel&#x27;: &#x27;13198785833&#x27;, &#x27;Name&#x27;: &#x27;DYodjey&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;514265196707149393&#x27;, &#x27;Brth&#x27;: &#x27;1967-07-14 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-22 09:05:33&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:05:33&#x27;}
+{&#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动MF11056&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009211718551540769200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:18:55&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009211718462319381200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000231906663210&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000231906663&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: 1730, &#x27;VipID&#x27;: &#x27;8820000231906663&#x27;, &#x27;Tel&#x27;: &#x27;13237783095&#x27;, &#x27;Name&#x27;: &#x27;OGqoaxp&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;516575199104143709&#x27;, &#x27;Brth&#x27;: &#x27;1991-04-14 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-21 17:19:00&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:00&#x27;}
+{&#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动BD34118&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009211715382920900200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:15:38&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009211715293336683200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000262537609768&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000262537609&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: 1729, &#x27;VipID&#x27;: &#x27;8820000262537609&#x27;, &#x27;Tel&#x27;: &#x27;13431323510&#x27;, &#x27;Name&#x27;: &#x27;RZreabt&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;511403193603181868&#x27;, &#x27;Brth&#x27;: &#x27;1936-03-18 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-21 17:15:43&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:15:43&#x27;}
+{&#x27;VipName&#x27;: &#x27;白银会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动NA88155&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009211713463892565200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:13:46&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;02&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009211713372151097200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000245607339011&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000245607339&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: 1728, &#x27;VipID&#x27;: &#x27;8820000245607339&#x27;, &#x27;Tel&#x27;: &#x27;13972818771&#x27;, &#x27;Name&#x27;: &#x27;OAsdcfw&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;519509193905148735&#x27;, &#x27;Brth&#x27;: &#x27;1939-05-14 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-21 17:13:51&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:13:51&#x27;}
+{&#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动IU18964&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009211641126437122200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:41:12&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009211641034431200200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000294687445019&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000294687445&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: 1727, &#x27;VipID&#x27;: &#x27;8820000294687445&#x27;, &#x27;Tel&#x27;: &#x27;13316304363&#x27;, &#x27;Name&#x27;: &#x27;NEemgxs&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;511067199307194220&#x27;, &#x27;Brth&#x27;: &#x27;1993-07-19 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-21 16:41:17&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:41:17&#x27;}
+{&#x27;VipName&#x27;: &#x27;白银会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动AR98191&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009211625063569679200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:25:06&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;02&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009211605586570492200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000224554808029&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000224554808&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: 1726, &#x27;VipID&#x27;: &#x27;8820000224554808&#x27;, &#x27;Tel&#x27;: &#x27;13761193214&#x27;, &#x27;Name&#x27;: &#x27;UQibaka&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;513400196108175112&#x27;, &#x27;Brth&#x27;: &#x27;1961-08-17 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-21 16:25:11&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:25:11&#x27;}
+{&#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动OF13081&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009211546394516071200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 15:46:39&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009211546190603482200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000208308338026&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000208308338&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: 1723, &#x27;VipID&#x27;: &#x27;8820000208308338&#x27;, &#x27;Tel&#x27;: &#x27;13631535179&#x27;, &#x27;Name&#x27;: &#x27;AGhhsio&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;519193196402225870&#x27;, &#x27;Brth&#x27;: &#x27;1964-02-22 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-21 15:46:44&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 15:46:44&#x27;}
+{&#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动EJ12749&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009211140158201531200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 11:40:15&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009101129501989622200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000286953635026&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000286953635&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: 1724, &#x27;VipID&#x27;: &#x27;8820000286953635&#x27;, &#x27;Tel&#x27;: &#x27;13691007341&#x27;, &#x27;Name&#x27;: &#x27;ADruief&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;518590194202265474&#x27;, &#x27;Brth&#x27;: &#x27;1942-02-26 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-21 16:20:30&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:20:30&#x27;}
+{&#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;PrmtName&#x27;: &#x27;会员活动EJ12749&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0012009101129598381939200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-10 11:29:59&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;DepID&#x27;: &#x27;&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;PrmtNo&#x27;: &#x27;0122009101129501989622200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000213880476019&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000213880476&#x27;, &#x27;Parval&#x27;: 0, &#x27;Cashier&#x27;: &#x27;miscs3&#x27;, &#x27;GstID&#x27;: 1720, &#x27;VipID&#x27;: &#x27;8820000213880476&#x27;, &#x27;Tel&#x27;: &#x27;13397027138&#x27;, &#x27;Name&#x27;: &#x27;IIgvpmc&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;515403192606246040&#x27;, &#x27;Brth&#x27;: &#x27;1926-06-24 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;RegDt&#x27;: &#x27;2020-09-10 11:30:04&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-10 11:30:04&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_register::test_check_member_register</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_get_member_data::test_get_vip_data</td>
+          <td class="col-duration">2.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;dtGridPager&#x27;: &#x27;{&quot;errorMsg&quot;:&quot;&quot;,&quot;isExport&quot;:false,&quot;pageSize&quot;:10,&quot;startRecord&quot;:400,&quot;nowPage&quot;:1,&quot;recordCount&quot;:1,&quot;pageCount&quot;:1,&quot;parameters&quot;:{&quot;Name&quot;:&quot;&quot;,&quot;NickName&quot;:&quot;&quot;,&quot;Tel&quot;:&quot;13767125061&quot;,&quot;CrdNo&quot;:&quot;&quot;,&quot;VipID&quot;:&quot;&quot;},&quot;fastQueryParameters&quot;:{},&quot;advanceQueryConditions&quot;:[],&quot;advanceQuerySorts&quot;:[]}&#x27;}
+{&#x27;Errormsg&#x27;: &#x27;&#x27;, &#x27;Issuccess&#x27;: True, &#x27;Exhibitdatas&#x27;: [{&#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;VipID&#x27;: &#x27;8820000240913680&#x27;, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;VipTpName&#x27;: &#x27;普通会员&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;VipStt&#x27;: 0, &#x27;VipSttName&#x27;: &#x27;&#x27;, &#x27;SexName&#x27;: &#x27;&#x27;, &#x27;MrryName&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000240913680&#x27;, &#x27;ID&#x27;: 1732, &#x27;UsrFlg&#x27;: &#x27;&#x27;, &#x27;NickName&#x27;: &#x27;OIvnitb&#x27;, &#x27;Pwd&#x27;: &#x27;96E79218965EB72C92A549DD5A330112&#x27;, &#x27;PwdDt&#x27;: &#x27;&#x27;, &#x27;Tel&#x27;: &#x27;13767125061&#x27;, &#x27;Eml&#x27;: &#x27;&#x27;, &#x27;Name&#x27;: &#x27;OIvnitb&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;516009193307237257&#x27;, &#x27;Brth&#x27;: &#x27;1933-07-23 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;Mrry&#x27;: &#x27;&#x27;, &#x27;BabyStt&#x27;: &#x27;F&#x27;, &#x27;Babydt&#x27;: &#x27;&#x27;, &#x27;Edu&#x27;: &#x27;&#x27;, &#x27;Ntn&#x27;: &#x27;&#x27;, &#x27;Prvc&#x27;: &#x27;&#x27;, &#x27;City&#x27;: &#x27;&#x27;, &#x27;Addr&#x27;: &#x27;&#x27;, &#x27;Avt&#x27;: &#x27;&#x27;, &#x27;RegDt&#x27;: &#x27;2020-09-22 10:21:27&#x27;, &#x27;MblVfy&#x27;: &#x27;T&#x27;, &#x27;EmlVfy&#x27;: &#x27;F&#x27;, &#x27;Infovfy&#x27;: &#x27;F&#x27;, &#x27;Stt&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:27&#x27;}], &#x27;Exportalldata&#x27;: False, &#x27;Exportfilename&#x27;: &#x27;&#x27;, &#x27;Exporttype&#x27;: &#x27;&#x27;, &#x27;Exportcolumns&#x27;: &#x27;&#x27;, &#x27;Recordcount&#x27;: 1, &#x27;Pagecount&#x27;: 1, &#x27;Pagesize&#x27;: 10, &#x27;Nowpage&#x27;: 1, &#x27;Startrecord&#x27;: 400, &#x27;Isexport&#x27;: False}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_get_member_data::test_get_vipcard_data</td>
+          <td class="col-duration">2.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;Errormsg&#x27;: &#x27;&#x27;, &#x27;Issuccess&#x27;: True, &#x27;Exhibitdatas&#x27;: [{&#x27;NickName&#x27;: &#x27;&#x27;, &#x27;MemberName&#x27;: &#x27;OIvnitb&#x27;, &#x27;Addr&#x27;: &#x27;&#x27;, &#x27;Eml&#x27;: &#x27;&#x27;, &#x27;CrdTpName&#x27;: &#x27;&#x27;, &#x27;Crdntu&#x27;: 0, &#x27;OrgType&#x27;: &#x27;&#x27;, &#x27;FmlyRltnName&#x27;: &#x27;&#x27;, &#x27;StrAmt&#x27;: &#x27;&#x27;, &#x27;OrgName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;CrdID&#x27;: &#x27;18820000240913680426&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000240913680&#x27;, &#x27;CrdPwd&#x27;: &#x27;&#x27;, &#x27;CrdTpid&#x27;: &#x27;000&#x27;, &#x27;GstID&#x27;: 1732, &#x27;VipID&#x27;: &#x27;8820000240913680&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MaCrd&#x27;: &#x27;T&#x27;, &#x27;Stt&#x27;: 0, &#x27;OpnDt&#x27;: &#x27;2020-09-22 10:21:27&#x27;, &#x27;Eddt&#x27;: &#x27;&#x27;, &#x27;Name&#x27;: &#x27;OIvnitb&#x27;, &#x27;Gnd&#x27;: 0, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;516009193307237257&#x27;, &#x27;Brthdy&#x27;: &#x27;1933-07-23 00:00:00&#x27;, &#x27;Mbl&#x27;: &#x27;13767125061&#x27;, &#x27;FmlyRltn&#x27;: &#x27;&#x27;, &#x27;EcrpBase&#x27;: &#x27;&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:24&#x27;}], &#x27;Exportalldata&#x27;: False, &#x27;Exportfilename&#x27;: &#x27;&#x27;, &#x27;Exporttype&#x27;: &#x27;&#x27;, &#x27;Exportcolumns&#x27;: &#x27;&#x27;, &#x27;Recordcount&#x27;: 1, &#x27;Pagecount&#x27;: 1, &#x27;Pagesize&#x27;: 10, &#x27;Nowpage&#x27;: 1, &#x27;Startrecord&#x27;: 0, &#x27;Isexport&#x27;: False}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_top_up_activity_gift::test_add_top_up_activity</td>
+          <td class="col-duration">0.17</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_top_up_activity_gift::test_get_top_up_activity_page</td>
+          <td class="col-duration">2.27</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;普通会员&#x27;, &#x27;DateStt&#x27;: 1, &#x27;DateSttName&#x27;: &#x27;活动待执行&#x27;, &#x27;BllNo&#x27;: &#x27;0462009221021358105723200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动CD180100&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:35&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 10:21:31&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:35&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;普通会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009220905468467827200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动WL92184&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:46&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 09:05:43&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;普通会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009220905419889629200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动YQ13839&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:41&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 09:05:38&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;黄金会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211719126329883200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动ZQ5987&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:12&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;03&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:19:10&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;黄金会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211719081211846200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动LW9874&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:08&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;03&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:19:05&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;钻石会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211715558540501200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动PL120116&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:15:55&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;04&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:15:53&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:38&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;钻石会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211715513138985200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动JY117170&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:15:51&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;04&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:15:48&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:38&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;白银会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211714048202672200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动IG147170&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:14:04&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;02&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:14:02&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:48&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;白银会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211714000208777200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动HX129122&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:13:59&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;02&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:13:57&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:48&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;黄金会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211641305475194200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动UE10577&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:41:30&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;03&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 16:41:28&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:42:14&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_top_up_activity_gift::test_check_top_up_activity</td>
+          <td class="col-duration">0.15</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_top_up_activity_integral::test_add_top_up_activity</td>
+          <td class="col-duration">0.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_top_up_activity_integral::test_get_top_up_activity_page</td>
+          <td class="col-duration">2.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;普通会员&#x27;, &#x27;DateStt&#x27;: 1, &#x27;DateSttName&#x27;: &#x27;活动待执行&#x27;, &#x27;BllNo&#x27;: &#x27;0462009221021404384585200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动TR12588&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:40&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 10:21:36&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:40&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;普通会员&#x27;, &#x27;DateStt&#x27;: 2, &#x27;DateSttName&#x27;: &#x27;活动正在执行&#x27;, &#x27;BllNo&#x27;: &#x27;0462009221021358105723200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动CD180100&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:35&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 10:21:31&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:40&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;普通会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009220905468467827200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动WL92184&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:46&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 09:05:43&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;普通会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009220905419889629200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动YQ13839&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:41&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;01&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 09:05:38&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;黄金会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211719126329883200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动ZQ5987&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:12&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;03&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:19:10&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;黄金会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211719081211846200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动LW9874&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:08&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;03&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:19:05&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;钻石会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211715558540501200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动PL120116&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:15:55&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;04&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:15:53&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:38&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;钻石会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211715513138985200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动JY117170&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:15:51&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;04&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:15:48&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:38&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;白银会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211714048202672200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动IG147170&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:14:04&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;02&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:14:02&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:48&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;UseOrgName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;白银会员&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;0462009211714000208777200002&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动HX129122&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:13:59&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;UseOrgID&#x27;: &#x27;0000&#x27;, &#x27;PrmtTyp&#x27;: 1, &#x27;VipTps&#x27;: &#x27;02&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:13:57&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:48&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_top_up_activity_integral::test_check_top_up_activity</td>
+          <td class="col-duration">0.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_top_up::test_add_member_top_up</td>
+          <td class="col-duration">0.21</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_top_up::test_get_member_top_up_page</td>
+          <td class="col-duration">2.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动CD180100&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422009221021449836670200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:44&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462009221021358105723200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000240913680426&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000240913680&#x27;, &#x27;VipID&#x27;: &#x27;8820000240913680&#x27;, &#x27;GstID&#x27;: 1732, &#x27;Parval&#x27;: 10120, &#x27;SumParval&#x27;: 10120, &#x27;RcvAmt&#x27;: 10120, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:44&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动YQ13839&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422009220905515966714200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:51&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462009220905419889629200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000262593612519&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000262593612&#x27;, &#x27;VipID&#x27;: &#x27;8820000262593612&#x27;, &#x27;GstID&#x27;: 1731, &#x27;Parval&#x27;: 5574, &#x27;SumParval&#x27;: 5574, &#x27;RcvAmt&#x27;: 5574, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:05:56&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动LW9874&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422009211719172258856200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:17&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462009211719081211846200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000231906663210&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000231906663&#x27;, &#x27;VipID&#x27;: &#x27;8820000231906663&#x27;, &#x27;GstID&#x27;: 1730, &#x27;Parval&#x27;: 15871, &#x27;SumParval&#x27;: 15871, &#x27;RcvAmt&#x27;: 15871, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:22&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动JY117170&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422009211716004484511200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:16:00&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462009211715513138985200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000262537609768&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000262537609&#x27;, &#x27;VipID&#x27;: &#x27;8820000262537609&#x27;, &#x27;GstID&#x27;: 1729, &#x27;Parval&#x27;: 17001, &#x27;SumParval&#x27;: 17001, &#x27;RcvAmt&#x27;: 17001, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:05&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动HX129122&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422009211714094584096200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:14:09&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462009211714000208777200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000245607339011&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000245607339&#x27;, &#x27;VipID&#x27;: &#x27;8820000245607339&#x27;, &#x27;GstID&#x27;: 1728, &#x27;Parval&#x27;: 11060, &#x27;SumParval&#x27;: 11060, &#x27;RcvAmt&#x27;: 11060, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:14&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动ZP117116&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422009211641352426627200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:41:35&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462009211641258437019200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000294687445019&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000294687445&#x27;, &#x27;VipID&#x27;: &#x27;8820000294687445&#x27;, &#x27;GstID&#x27;: 1727, &#x27;Parval&#x27;: 6672, &#x27;SumParval&#x27;: 6672, &#x27;RcvAmt&#x27;: 6672, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:41:40&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动DL13993&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422009211548008027356200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 15:48:00&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462009211547270517930200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000208308338026&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000208308338&#x27;, &#x27;VipID&#x27;: &#x27;8820000208308338&#x27;, &#x27;GstID&#x27;: 1723, &#x27;Parval&#x27;: 5968, &#x27;SumParval&#x27;: 5968, &#x27;RcvAmt&#x27;: 5968, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 15:48:05&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动UU16388&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422009101130230125713200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-10 11:30:22&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462009101130135862050200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000213880476019&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000213880476&#x27;, &#x27;VipID&#x27;: &#x27;8820000213880476&#x27;, &#x27;GstID&#x27;: 1720, &#x27;Parval&#x27;: 13554, &#x27;SumParval&#x27;: 13554, &#x27;RcvAmt&#x27;: 13554, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-10 11:30:28&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动MC11692&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422008181714212953303200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 17:14:21&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462008181714120223807200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000299349369021&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000299349369&#x27;, &#x27;VipID&#x27;: &#x27;8820000299349369&#x27;, &#x27;GstID&#x27;: 1488, &#x27;Parval&#x27;: 17436, &#x27;SumParval&#x27;: 17436, &#x27;RcvAmt&#x27;: 17436, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 17:14:26&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;PrmtNoName&#x27;: &#x27;会员活动YO84146&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;VipTpID&#x27;: &#x27;&#x27;, &#x27;VipTpName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0422008181657406800443200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 16:57:40&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;AccsTyp&#x27;: 2, &#x27;PrmtNo&#x27;: &#x27;0462008181657314576371200002&#x27;, &#x27;AtmStt&#x27;: &#x27;F&#x27;, &#x27;CrdID&#x27;: &#x27;18820000269007051883&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000269007051&#x27;, &#x27;VipID&#x27;: &#x27;8820000269007051&#x27;, &#x27;GstID&#x27;: 1487, &#x27;Parval&#x27;: 15961, &#x27;SumParval&#x27;: 15961, &#x27;RcvAmt&#x27;: 15961, &#x27;Cashier&#x27;: &#x27;[miscs3]mi&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 16:57:45&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_top_up::test_check_member_top_up</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_integral_adjustment::test_add_integral_adjustment</td>
+          <td class="col-duration">0.14</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_integral_adjustment::test_get_integral_adjustment_page</td>
+          <td class="col-duration">2.15</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;IIgvpmc&#x27;, &#x27;Tel&#x27;: &#x27;13397027138&#x27;, &#x27;Name&#x27;: &#x27;IIgvpmc&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092009101130278598360200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-10 11:30:27&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1720, &#x27;VipID&#x27;: &#x27;8820000213880476&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;IntgModi&#x27;: 889034, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: -1, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:38:05&#x27;}
+{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;&#x27;, &#x27;Tel&#x27;: &#x27;13870729763&#x27;, &#x27;Name&#x27;: &#x27;BTagequ&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092008211556216731793200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-21 15:56:21&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1496, &#x27;VipID&#x27;: &#x27;99000100000014&#x27;, &#x27;IntgAva&#x27;: 10000, &#x27;IntgModi&#x27;: 100, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: -1, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-26 10:52:56&#x27;}
+{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;&#x27;, &#x27;Tel&#x27;: &#x27;13870729763&#x27;, &#x27;Name&#x27;: &#x27;BTagequ&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092008211549230852470200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-21 15:49:23&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1496, &#x27;VipID&#x27;: &#x27;99000100000014&#x27;, &#x27;IntgAva&#x27;: 10000, &#x27;IntgModi&#x27;: 100, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: -1, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-26 10:53:01&#x27;}
+{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;OIvnitb&#x27;, &#x27;Tel&#x27;: &#x27;13767125061&#x27;, &#x27;Name&#x27;: &#x27;OIvnitb&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092009221021496821415200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:49&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1732, &#x27;VipID&#x27;: &#x27;8820000240913680&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;IntgModi&#x27;: 1068044, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:49&#x27;}
+{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;OGqoaxp&#x27;, &#x27;Tel&#x27;: &#x27;13237783095&#x27;, &#x27;Name&#x27;: &#x27;OGqoaxp&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092009211719217663453200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:21&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1730, &#x27;VipID&#x27;: &#x27;8820000231906663&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;IntgModi&#x27;: 1156615, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:21&#x27;}
+{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;DYodjey&#x27;, &#x27;Tel&#x27;: &#x27;13198785833&#x27;, &#x27;Name&#x27;: &#x27;DYodjey&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092009220905565985200200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:05:56&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1731, &#x27;VipID&#x27;: &#x27;8820000262593612&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;IntgModi&#x27;: 1040332, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:13:14&#x27;}
+{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;RZreabt&#x27;, &#x27;Tel&#x27;: &#x27;13431323510&#x27;, &#x27;Name&#x27;: &#x27;RZreabt&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092009211716049925998200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:16:04&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1729, &#x27;VipID&#x27;: &#x27;8820000262537609&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;IntgModi&#x27;: 443892, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:18&#x27;}
+{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;OAsdcfw&#x27;, &#x27;Tel&#x27;: &#x27;13972818771&#x27;, &#x27;Name&#x27;: &#x27;OAsdcfw&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092009211714142060437200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:14:14&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1728, &#x27;VipID&#x27;: &#x27;8820000245607339&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;IntgModi&#x27;: 923002, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:21&#x27;}
+{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;NEemgxs&#x27;, &#x27;Tel&#x27;: &#x27;13316304363&#x27;, &#x27;Name&#x27;: &#x27;NEemgxs&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092009211641398613737200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:41:39&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1727, &#x27;VipID&#x27;: &#x27;8820000294687445&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;IntgModi&#x27;: 312225, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:41:48&#x27;}
+{&#x27;AccOrgName&#x27;: &#x27;总部&#x27;, &#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;NickName&#x27;: &#x27;AGhhsio&#x27;, &#x27;Tel&#x27;: &#x27;13631535179&#x27;, &#x27;Name&#x27;: &#x27;AGhhsio&#x27;, &#x27;CrtnResn&#x27;: &#x27;积分调整&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0092009211637341632870200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:37:34&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;AccOrgID&#x27;: &#x27;0000&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;GstID&#x27;: 1723, &#x27;VipID&#x27;: &#x27;8820000208308338&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;IntgModi&#x27;: 797192, &#x27;IntgModirs&#x27;: &#x27;1&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:37:54&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_exchange_activity_gift::test_add_exchange_activity</td>
+          <td class="col-duration">0.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_exchange_activity_gift::test_get_exchange_activity_page</td>
+          <td class="col-duration">2.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 1, &#x27;DateSttName&#x27;: &#x27;活动待执行&#x27;, &#x27;BllNo&#x27;: &#x27;01820000256100629&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:54&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动YO134117&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 10:21:50&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:54&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;01820000295215250&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:06:01&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动UL14599&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 09:05:57&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;01820000210316078&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:26&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动XX116118&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:19:24&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;01820000293576465&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:16:09&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动LB13537&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:16:07&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:16:39&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;白银会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;01820000275279205&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:14:18&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动EJ118133&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;02&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 17:14:16&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:14:49&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;01820000226253964&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:41:44&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动YM104129&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 16:41:42&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:42:14&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;01820000287733584&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 15:51:07&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动LV7644&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-21 15:51:04&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-24 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 15:58:08&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;01820000212333162&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-10 11:30:32&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动HD149182&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-10 11:30:27&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-13 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 11:42:13&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;01820000213273898&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 17:14:30&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动UQ17478&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;StDt&#x27;: &#x27;2020-08-18 17:14:27&#x27;, &#x27;EnDt&#x27;: &#x27;2020-08-21 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 17:15:00&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 0, &#x27;DateSttName&#x27;: &#x27;活动已终止&#x27;, &#x27;BllNo&#x27;: &#x27;01820000221700559&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 16:57:49&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动GY6855&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;StDt&#x27;: &#x27;2020-08-18 16:57:46&#x27;, &#x27;EnDt&#x27;: &#x27;2020-08-21 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 2, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: -1, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 16:58:19&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_exchange_activity_gift::test_get_exchange_activity</td>
+          <td class="col-duration">2.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;Success&#x27;: True, &#x27;Errorcode&#x27;: 0, &#x27;Message&#x27;: &#x27;&#x27;, &#x27;Data&#x27;: {&#x27;Model&#x27;: {&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;TknName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;DateStt&#x27;: 1, &#x27;DateSttName&#x27;: &#x27;活动待执行&#x27;, &#x27;BllNo&#x27;: &#x27;01820000256100629&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:21:54&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Name&#x27;: &#x27;会员活动YO134117&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;MakeOrgID&#x27;: &#x27;0000&#x27;, &#x27;ProfitTyp&#x27;: 1, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;StDt&#x27;: &#x27;2020-09-22 10:21:50&#x27;, &#x27;EnDt&#x27;: &#x27;2020-09-25 23:59:59&#x27;, &#x27;Startdate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;EndDate&#x27;: &#x27;0001-01-01 00:00:00&#x27;, &#x27;ShopType&#x27;: 0, &#x27;BllType&#x27;: 0, &#x27;CshTm&#x27;: 4, &#x27;IsRepJoin&#x27;: 0, &#x27;IsExcSpe&#x27;: 0, &#x27;AutoRun&#x27;: 0, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:54&#x27;}, &#x27;List&#x27;: [{&#x27;BllNo&#x27;: &#x27;01820000256100629&#x27;, &#x27;Lvl&#x27;: 1, &#x27;Amt&#x27;: 4037, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Bestowal&#x27;: &#x27;2229741860193&#x27;, &#x27;Name&#x27;: &#x27;赠品名称u983&#x27;, &#x27;TknID&#x27;: &#x27;&#x27;, &#x27;TknAmt&#x27;: 0, &#x27;StepVal&#x27;: 0, &#x27;ProfitPer&#x27;: 0, &#x27;TStDt&#x27;: &#x27;&#x27;, &#x27;TEdDt&#x27;: &#x27;&#x27;, &#x27;UseOrgID&#x27;: &#x27;&#x27;, &#x27;ChangeMoney&#x27;: 0, &#x27;CanlFlg&#x27;: &#x27;F&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:54&#x27;}]}}
+{&#x27;BllNo&#x27;: &#x27;01820000256100629&#x27;, &#x27;Lvl&#x27;: 1, &#x27;Amt&#x27;: 4037, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;Bestowal&#x27;: &#x27;2229741860193&#x27;, &#x27;Name&#x27;: &#x27;赠品名称u983&#x27;, &#x27;TknID&#x27;: &#x27;&#x27;, &#x27;TknAmt&#x27;: 0, &#x27;StepVal&#x27;: 0, &#x27;ProfitPer&#x27;: 0, &#x27;TStDt&#x27;: &#x27;&#x27;, &#x27;TEdDt&#x27;: &#x27;&#x27;, &#x27;UseOrgID&#x27;: &#x27;&#x27;, &#x27;ChangeMoney&#x27;: 0, &#x27;CanlFlg&#x27;: &#x27;F&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:54&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_exchange_activity_gift::test_check_exchange_activity</td>
+          <td class="col-duration">0.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_account::test_vip_account</td>
+          <td class="col-duration">2.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;Errormsg&#x27;: &#x27;&#x27;, &#x27;Issuccess&#x27;: True, &#x27;Exhibitdatas&#x27;: [{&#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;UsrFlg&#x27;: &#x27;&#x27;, &#x27;NickName&#x27;: &#x27;OIvnitb&#x27;, &#x27;Tel&#x27;: &#x27;13767125061&#x27;, &#x27;Eml&#x27;: &#x27;&#x27;, &#x27;Name&#x27;: &#x27;OIvnitb&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;516009193307237257&#x27;, &#x27;Brth&#x27;: &#x27;1933-07-23 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;BabyStt&#x27;: &#x27;F&#x27;, &#x27;Avt&#x27;: &#x27;&#x27;, &#x27;Mrry&#x27;: &#x27;&#x27;, &#x27;StvalAmt&#x27;: 10120.0, &#x27;IntgAva&#x27;: &#x27;&#x27;, &#x27;DtktAva&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;StrvlsttName&#x27;: &#x27;&#x27;, &#x27;LQBAva&#x27;: &#x27;&#x27;, &#x27;CashAva&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GstID&#x27;: 1732, &#x27;VipID&#x27;: &#x27;8820000240913680&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;OpnDt&#x27;: &#x27;2020-09-22 10:21:27&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;Stt&#x27;: 0, &#x27;Strvlstt&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;LastDate&#x27;: &#x27;&#x27;, &#x27;Actvgrd&#x27;: &#x27;&#x27;, &#x27;Vlgrd&#x27;: &#x27;&#x27;, &#x27;Yrconsl&#x27;: 0, &#x27;Yrprft&#x27;: 0, &#x27;ABC&#x27;: &#x27;&#x27;, &#x27;RgstApp&#x27;: &#x27;2&#x27;, &#x27;Lne&#x27;: 0, &#x27;BndDt&#x27;: &#x27;&#x27;, &#x27;UnBndDt&#x27;: &#x27;&#x27;, &#x27;OpnID&#x27;: &#x27;&#x27;, &#x27;RegstMonth&#x27;: &#x27;&#x27;, &#x27;RgWxMonth&#x27;: &#x27;&#x27;, &#x27;Rcmd&#x27;: &#x27;&#x27;, &#x27;EcrpBase&#x27;: &#x27;&#x27;, &#x27;Ecrp1&#x27;: &#x27;&#x27;, &#x27;Ecrp2&#x27;: &#x27;&#x27;, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:46&#x27;}], &#x27;Exportalldata&#x27;: False, &#x27;Exportfilename&#x27;: &#x27;&#x27;, &#x27;Exporttype&#x27;: &#x27;&#x27;, &#x27;Exportcolumns&#x27;: &#x27;&#x27;, &#x27;Recordcount&#x27;: 1, &#x27;Pagecount&#x27;: 1, &#x27;Pagesize&#x27;: 10, &#x27;Nowpage&#x27;: 1, &#x27;Startrecord&#x27;: 0, &#x27;Isexport&#x27;: False}
+{&#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;UsrFlg&#x27;: &#x27;&#x27;, &#x27;NickName&#x27;: &#x27;OIvnitb&#x27;, &#x27;Tel&#x27;: &#x27;13767125061&#x27;, &#x27;Eml&#x27;: &#x27;&#x27;, &#x27;Name&#x27;: &#x27;OIvnitb&#x27;, &#x27;IDntTp&#x27;: &#x27;&#x27;, &#x27;IDntNmb&#x27;: &#x27;516009193307237257&#x27;, &#x27;Brth&#x27;: &#x27;1933-07-23 00:00:00&#x27;, &#x27;Sex&#x27;: 0, &#x27;BabyStt&#x27;: &#x27;F&#x27;, &#x27;Avt&#x27;: &#x27;&#x27;, &#x27;Mrry&#x27;: &#x27;&#x27;, &#x27;StvalAmt&#x27;: 10120.0, &#x27;IntgAva&#x27;: &#x27;&#x27;, &#x27;DtktAva&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;StrvlsttName&#x27;: &#x27;&#x27;, &#x27;LQBAva&#x27;: &#x27;&#x27;, &#x27;CashAva&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;GstID&#x27;: 1732, &#x27;VipID&#x27;: &#x27;8820000240913680&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;OpnDt&#x27;: &#x27;2020-09-22 10:21:27&#x27;, &#x27;MngID&#x27;: &#x27;miscs3&#x27;, &#x27;Stt&#x27;: 0, &#x27;Strvlstt&#x27;: 0, &#x27;Brf&#x27;: &#x27;&#x27;, &#x27;LastDate&#x27;: &#x27;&#x27;, &#x27;Actvgrd&#x27;: &#x27;&#x27;, &#x27;Vlgrd&#x27;: &#x27;&#x27;, &#x27;Yrconsl&#x27;: 0, &#x27;Yrprft&#x27;: 0, &#x27;ABC&#x27;: &#x27;&#x27;, &#x27;RgstApp&#x27;: &#x27;2&#x27;, &#x27;Lne&#x27;: 0, &#x27;BndDt&#x27;: &#x27;&#x27;, &#x27;UnBndDt&#x27;: &#x27;&#x27;, &#x27;OpnID&#x27;: &#x27;&#x27;, &#x27;RegstMonth&#x27;: &#x27;&#x27;, &#x27;RgWxMonth&#x27;: &#x27;&#x27;, &#x27;Rcmd&#x27;: &#x27;&#x27;, &#x27;EcrpBase&#x27;: &#x27;&#x27;, &#x27;Ecrp1&#x27;: &#x27;&#x27;, &#x27;Ecrp2&#x27;: &#x27;&#x27;, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:21:46&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_integral_exchange_gift::test_get_integral_exchange_page</td>
+          <td class="col-duration">2.28</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;DYodjey&#x27;, &#x27;Tel&#x27;: &#x27;13198785833&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532009221019531476725200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:19:53&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000262593612&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000262593612&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 1040332, &#x27;SumIntg&#x27;: 7556, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:20:00&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;DYodjey&#x27;, &#x27;Tel&#x27;: &#x27;13198785833&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532009221017359584764200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:17:35&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000262593612&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000262593612&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;SumIntg&#x27;: 0, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:17:43&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;DYodjey&#x27;, &#x27;Tel&#x27;: &#x27;13198785833&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532009221013339483507200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:13:33&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000262593612&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000262593612&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;SumIntg&#x27;: 0, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:13:41&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;DYodjey&#x27;, &#x27;Tel&#x27;: &#x27;13198785833&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532009221010221666607200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:10:21&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000262593612&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000262593612&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 0, &#x27;SumIntg&#x27;: 0, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:10:32&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;OAsdcfw&#x27;, &#x27;Tel&#x27;: &#x27;13972818771&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532009211714319658539200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:14:31&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000245607339&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000245607339&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 923002, &#x27;SumIntg&#x27;: 6868, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:22&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;NEemgxs&#x27;, &#x27;Tel&#x27;: &#x27;13316304363&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532009211641577597374200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:41:57&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000294687445&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000294687445&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 312225, &#x27;SumIntg&#x27;: 10648, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:42:05&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;AGhhsio&#x27;, &#x27;Tel&#x27;: &#x27;13631535179&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532009211639406836318200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 16:39:40&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000208308338&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000208308338&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 1764448, &#x27;SumIntg&#x27;: 12198, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:39:47&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;ZLpqjvv&#x27;, &#x27;Tel&#x27;: &#x27;13632465137&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532008181714434992357200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 17:14:43&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000299349369&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000299349369&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 918785, &#x27;SumIntg&#x27;: 11260, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 16:34:52&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;INadsad&#x27;, &#x27;Tel&#x27;: &#x27;13474348002&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532008181658028678428200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 16:58:02&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000269007051&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000269007051&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 809890, &#x27;SumIntg&#x27;: 11418, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 16:58:10&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;MemName&#x27;: &#x27;VMiuggy&#x27;, &#x27;Tel&#x27;: &#x27;13459892605&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0532008181656277235939200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 16:56:27&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;VipID&#x27;: &#x27;8820000296677117&#x27;, &#x27;GstID&#x27;: &#x27;&#x27;, &#x27;CrdNo&#x27;: &#x27;8820000296677117&#x27;, &#x27;CrdID&#x27;: &#x27;&#x27;, &#x27;IntgAva&#x27;: 671340, &#x27;SumIntg&#x27;: 6042, &#x27;SumTknMoney&#x27;: 0, &#x27;SumChgMoney&#x27;: 0, &#x27;Remark&#x27;: &#x27;&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 16:56:34&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_integral_exchange_gift::test_get_integral_exchange</td>
+          <td class="col-duration">2.15</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;BllNo&#x27;: &#x27;0532009221019531476725200002&#x27;, &#x27;Rdx&#x27;: 1, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;UseIntg&#x27;: 7556, &#x27;Bestowal&#x27;: &#x27;1914571343147&#x27;, &#x27;Name&#x27;: &#x27;赠品名称e559&#x27;, &#x27;CostPrice&#x27;: 0, &#x27;Qty&#x27;: 2, &#x27;TknMoney&#x27;: 0, &#x27;ChgMoney&#x27;: 0, &#x27;TknID&#x27;: &#x27;&#x27;, &#x27;Amt&#x27;: 3778, &#x27;TStDt&#x27;: &#x27;&#x27;, &#x27;TEdDt&#x27;: &#x27;&#x27;, &#x27;BillType&#x27;: 1, &#x27;IntgCshBllNo&#x27;: &#x27;01820000295215250&#x27;, &#x27;IntgCshLvl&#x27;: 1, &#x27;AccList&#x27;: &#x27;&#x27;, &#x27;CanlFlg&#x27;: &#x27;F&#x27;, &#x27;Brf&#x27;: &#x27;apitest&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_integral_exchange_gift::test_check_integral_exchange</td>
+          <td class="col-duration">0.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_integral_sum::test_get_integral_sum</td>
+          <td class="col-duration">0.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_freeze::test_add_member_freeze</td>
+          <td class="col-duration">0.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_freeze::test_get_member_freeze_page</td>
+          <td class="col-duration">2.16</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009221022149778239200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:22:15&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;SttNew&#x27;: 1, &#x27;Brf&#x27;: &#x27;批量生成冻结状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:22:15&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009211142044228596200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 11:42:04&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 11:42:04&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009211141557122732200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 11:41:56&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;SttNew&#x27;: 1, &#x27;Brf&#x27;: &#x27;批量生成冻结状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 11:41:56&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082008181540291386277200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 15:40:29&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 15:40:29&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082008181519440236878200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 15:19:44&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 15:19:44&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082008171730393096566200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-17 17:30:39&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-17 17:30:39&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009220906284736876200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:06:28&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009220906236143025200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:06:24&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;SttNew&#x27;: 1, &#x27;Brf&#x27;: &#x27;批量生成冻结状态维护单&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:28&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009211719507799871200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:51&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009211719462186733200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:46&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;SttNew&#x27;: 1, &#x27;Brf&#x27;: &#x27;批量生成冻结状态维护单&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:51&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_freeze::test_check_member_freeze</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_unfreeze::test_add_member_unfreeze</td>
+          <td class="col-duration">0.15</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_unfreeze::test_get_member_unfreeze_page</td>
+          <td class="col-duration">2.12</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009221022196232121200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:22:20&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:22:20&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009211142044228596200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 11:42:04&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 11:42:04&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009211141557122732200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 11:41:56&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;SttNew&#x27;: 1, &#x27;Brf&#x27;: &#x27;批量生成冻结状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 11:41:56&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082008181540291386277200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 15:40:29&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 15:40:29&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082008181519440236878200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-18 15:19:44&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-18 15:19:44&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;钻石会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082008171730393096566200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-08-17 17:30:39&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;04&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 0, &#x27;FlwStt&#x27;: 0, &#x27;Uptr&#x27;: &#x27;[miscs3]miscs3&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-08-17 17:30:39&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009221022149778239200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 10:22:15&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;SttNew&#x27;: 1, &#x27;Brf&#x27;: &#x27;批量生成冻结状态维护单&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 10:22:19&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009220906284736876200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:06:28&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:33&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;普通会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009220906236143025200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-22 09:06:24&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;01&#x27;, &#x27;SttNew&#x27;: 1, &#x27;Brf&#x27;: &#x27;批量生成冻结状态维护单&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-22 09:06:28&#x27;}
+{&#x27;OrgName&#x27;: &#x27;总部&#x27;, &#x27;VipName&#x27;: &#x27;黄金会员&#x27;, &#x27;SttNewName&#x27;: &#x27;&#x27;, &#x27;SttName&#x27;: &#x27;&#x27;, &#x27;FlwSttName&#x27;: &#x27;&#x27;, &#x27;BllNo&#x27;: &#x27;0082009211719507799871200002&#x27;, &#x27;BizDt&#x27;: &#x27;2020-09-21 17:19:51&#x27;, &#x27;CpnID&#x27;: &#x27;200002&#x27;, &#x27;OrgID&#x27;: &#x27;0000&#x27;, &#x27;SttType&#x27;: 0, &#x27;VipTpID&#x27;: &#x27;03&#x27;, &#x27;SttNew&#x27;: 0, &#x27;Brf&#x27;: &#x27;批量生成解冻状态维护单&#x27;, &#x27;Stt&#x27;: 50, &#x27;FlwStt&#x27;: 1, &#x27;Uptr&#x27;: &#x27;884&#x27;, &#x27;UptDtt&#x27;: &#x27;2020-09-21 17:19:55&#x27;}
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_member_unfreeze::test_check_member_unfreeze</td>
+          <td class="col-duration">0.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_stop_activity::test_stop_register_activity_gift</td>
+          <td class="col-duration">0.10</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_stop_activity::test_stop_register_activity_integral</td>
+          <td class="col-duration">0.10</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_stop_activity::test_stop_top_up_activity_gift</td>
+          <td class="col-duration">0.10</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_stop_activity::test_stop_top_up_activity_integral</td>
+          <td class="col-duration">0.10</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::Test_stop_activity::test_stop_exchange_activity</td>
+          <td class="col-duration">0.11</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>操作成功
+<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">conftest/test_crm.py::test_1</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> ------------------------------Captured stdout call------------------------------ <br/>
+0.0
+<br/></div></td></tr></tbody></table></body></html>
